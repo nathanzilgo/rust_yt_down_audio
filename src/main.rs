@@ -1,8 +1,11 @@
 use std::process::Command;
 use std::io;
+use std::path::Path;
 
 fn get_input() -> String {
     let mut input = String::new();
+    
+    println!("Please enter the youtube link you want to download:");
 
     io::stdin()
         .read_line(&mut input)
@@ -20,16 +23,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     println!("Downloading audio from: {}", url);
 
+    let mut args = vec![
+        "-x".to_string(),
+        "--audio-format".to_string(), "mp3".to_string(),
+        "--extractor-args".to_string(), "youtube:player_client=web".to_string(),
+        "--remote-components".to_string(), "ejs:github".to_string(),
+        "-o".to_string(), "%(title)s.%(ext)s".to_string(),
+    ];
+
+    // Use cookies file if available (for Docker), otherwise try browser
+    if Path::new("/cookies.txt").exists() {
+        println!("Using cookies file: /cookies.txt");
+        args.push("--cookies".to_string());
+        args.push("/cookies.txt".to_string());
+    } else if cfg!(target_os = "windows") || std::env::var("BROWSER_COOKIES").is_ok() {
+        println!("Using browser cookies");
+        args.push("--cookies-from-browser".to_string());
+        args.push("firefox".to_string());
+    }
+
+    args.push(url);
+
     let status = Command::new("yt-dlp")
-        .args([
-            "-x",                    // Extract audio
-            "--audio-format", "mp3", // Convert to mp3
-            "--cookies-from-browser", "firefox", // Use cookies from Firefox
-            "--extractor-args", "youtube:player_client=web",
-            "--remote-components", "ejs:github",
-            "-o", "%(title)s.%(ext)s",
-            &url,
-        ])
+        .args(&args)
         .status()?;
 
     if status.success() {
