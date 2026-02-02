@@ -2,6 +2,8 @@
 
 A simple CLI tool to download YouTube audio as MP3, written in Rust. Uses [yt-dlp](https://github.com/yt-dlp/yt-dlp) under the hood.
 
+Rust here is solely for learning purposes!
+
 ## Features
 
 - Downloads YouTube videos as MP3 audio
