@@ -1,6 +1,6 @@
 target/
-Cargo.lock
 .git/
+.github/
 .gitignore
 *.md
 *.mp3
