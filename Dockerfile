@@ -31,12 +31,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the compiled binary from builder
+# Copy both compiled binaries from builder
 COPY --from=builder /app/target/release/yt_down /usr/local/bin/
+COPY --from=builder /app/target/release/yt_down_web /usr/local/bin/
 
 # Copy Deno binary (faster than pulling the full deno:debian image)
 COPY --from=denoland/deno:bin /deno /usr/bin/deno
 
 WORKDIR /downloads
 
-ENTRYPOINT ["yt_down"]
+# Default to web server for deployment; override with "yt_down" for CLI usage
+ENTRYPOINT ["yt_down_web"]
