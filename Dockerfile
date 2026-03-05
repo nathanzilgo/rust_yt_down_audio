@@ -1,5 +1,5 @@
 # Use cargo-chef for dependency caching in Rust
-FROM lukemathwalker/cargo-chef:latest-rust-1.84-slim-bookworm AS chef
+FROM lukemathwalker/cargo-chef:latest-rust-1.85-slim-bookworm AS chef
 
 WORKDIR /app
 
