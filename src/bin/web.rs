@@ -124,7 +124,7 @@ async fn download(Json(payload): Json<DownloadRequest>) -> impl IntoResponse {
 #[tokio::main]
 async fn main() {
     let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
-    let addr = format!("0.0.0.0:{}", port);
+    let addr = format!("[IP_ADDRESS]");
 
     println!("🎵 yt_down web server starting on http://{}", addr);
 

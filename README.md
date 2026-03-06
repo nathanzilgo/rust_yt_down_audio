@@ -81,4 +81,3 @@ docker run -it -v "$(pwd)/downloads:/downloads" -v "$(pwd)/cookies.txt:/cookiesf
 2. Extracts audio using yt-dlp
 3. Converts to MP3 using ffmpeg
 4. Saves with the video title as filename
-
