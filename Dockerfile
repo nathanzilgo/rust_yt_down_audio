@@ -38,11 +38,13 @@ COPY --from=builder /app/target/release/yt_down_web /usr/local/bin/
 # Copy Deno binary (faster than pulling the full deno:debian image)
 COPY --from=denoland/deno:bin /deno /usr/bin/deno
 
-# Conditionally copy cookies.txt if it exists (by including Cargo.tom[l] we ensure it matches at least one file)
-COPY --from=builder /app/Cargo.tom[l] /app/cookies.tx[t] /
-RUN rm -f /Cargo.toml
+# Create secrets directory for runtime-mounted cookies
+RUN mkdir -p /secrets
 
 WORKDIR /downloads
+
+# Set environment variable for cookies path
+ENV COOKIES_PATH=/secrets/cookies.txt
 
 # Default to web server for deployment; override with "yt_down" for CLI usage
 ENTRYPOINT ["yt_down_web"]

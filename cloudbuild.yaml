@@ -11,7 +11,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}']
 
-  # Deploy to Cloud Run
+  # Deploy to Cloud Run with secret mounted
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -29,6 +29,7 @@ steps:
       - '--concurrency=10'
       - '--min-instances=0'
       - '--max-instances=2'
+      - '--update-secrets=/secrets/cookies.txt=youtube-cookies:latest'
 
 substitutions:
   _REGION: us-central1

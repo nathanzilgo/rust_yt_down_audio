@@ -4,3 +4,5 @@ README.local.md
 .env
 cookies.txt
 build_log.txt
+Cargo.lock
+
