@@ -1,10 +1,11 @@
 use axum::{
-    Router,
     extract::Json,
-    http::{HeaderMap, HeaderValue, StatusCode, header},
+    http::{header, HeaderMap, HeaderValue, StatusCode},
     response::{Html, IntoResponse},
     routing::{get, post},
+    Router,
 };
+use local_ip_address::local_ip;
 use serde::Deserialize;
 use tower_http::cors::CorsLayer;
 use uuid::Uuid;
@@ -54,9 +55,7 @@ async fn download(Json(payload): Json<DownloadRequest>) -> impl IntoResponse {
     let result = tokio::task::spawn_blocking(move || {
         let args = downloader::build_ytdlp_args(&url, &output_template);
 
-        let output = std::process::Command::new("yt-dlp")
-            .args(&args)
-            .output();
+        let output = std::process::Command::new("yt-dlp").args(&args).output();
 
         match output {
             Ok(output) => {
@@ -66,7 +65,8 @@ async fn download(Json(payload): Json<DownloadRequest>) -> impl IntoResponse {
                         for entry in entries.flatten() {
                             let path = entry.path();
                             if path.extension().is_some_and(|ext| ext == "mp3") {
-                                let filename = path.file_name()
+                                let filename = path
+                                    .file_name()
                                     .unwrap_or_default()
                                     .to_string_lossy()
                                     .to_string();
@@ -95,16 +95,13 @@ async fn download(Json(payload): Json<DownloadRequest>) -> impl IntoResponse {
     match result {
         Ok(Ok((filename, data))) => {
             let mut headers = HeaderMap::new();
-            headers.insert(
-                header::CONTENT_TYPE,
-                HeaderValue::from_static("audio/mpeg"),
-            );
+            headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("audio/mpeg"));
             let disposition = format!("attachment; filename=\"{}\"", filename);
             headers.insert(
                 header::CONTENT_DISPOSITION,
-                HeaderValue::from_str(&disposition).unwrap_or(
-                    HeaderValue::from_static("attachment; filename=\"download.mp3\""),
-                ),
+                HeaderValue::from_str(&disposition).unwrap_or(HeaderValue::from_static(
+                    "attachment; filename=\"download.mp3\"",
+                )),
             );
             (StatusCode::OK, headers, data)
         }
@@ -123,8 +120,9 @@ async fn download(Json(payload): Json<DownloadRequest>) -> impl IntoResponse {
 
 #[tokio::main]
 async fn main() {
+    let my_local_ip: &str = "127.0.0.1";
     let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
-    let addr = format!("0.0.0.0:{}", port);
+    let addr = format!("{}:{}", my_local_ip, port);
 
     println!("🎵 yt_down web server starting on http://{}", addr);
 

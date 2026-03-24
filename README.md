@@ -75,6 +75,42 @@ If YouTube blocks downloads, you can provide cookies:
 docker run -it -v "$(pwd)/downloads:/downloads" -v "$(pwd)/cookies.txt:/cookiesftxt" yt_down
 ```.
 
+## Cloud Deployment (CI/CD)
+
+### Secure Cookie Setup
+
+Cookies contain authentication credentials and should **never be committed to git**. Instead, use Google Cloud Secret Manager:
+
+1. **Store cookies as a secret:**
+   ```bash
+   gcloud secrets create youtube-cookies --data-file=cookies.txt
+   ```
+
+2. **Grant Cloud Build access to the secret:**
+   ```bash
+   gcloud projects add-iam-policy-binding $PROJECT_ID \
+     --member=serviceAccount:$PROJECT_NUMBER@cloudbuild.gserviceaccount.com \
+     --role=roles/secretmanager.secretAccessor
+   ```
+
+### Deploy via Cloud Build
+
+```bash
+gcloud builds submit --config cloudbuild.yaml
+```
+
+### Setup GitHub Integration (Optional)
+
+Create a Cloud Build trigger for automatic deployment on push:
+
+```bash
+gcloud builds triggers create github \
+  --repo-name=yt_down \
+  --repo-owner=YOUR_GITHUB_USERNAME \
+  --branch-pattern=main \
+  --build-config=cloudbuild.yaml
+```
+
 ## How It Works
 
 1. Prompts for a YouTube URL

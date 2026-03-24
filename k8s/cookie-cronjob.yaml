@@ -1,0 +1,57 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: yt-cookie-renewer
+spec:
+  # Run every day at midnight (adjust schedule as needed)
+  schedule: "0 0 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: cookie-updater-sa
+          containers:
+          - name: renewer
+            # You would build a custom image containing your python script and kubectl
+            image: your-docker-registry/cookie-renewer:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Extracting new cookies..."
+              # Run your script to generate/fetch cookies.txt
+              python3 /app/update-cookies.py > /tmp/cookies.txt
+              
+              echo "Updating Kubernetes Secret..."
+              kubectl create secret generic yt-cookies \
+                --from-file=cookies.txt=/tmp/cookies.txt \
+                --dry-run=client -o yaml | kubectl apply -f -
+              
+              echo "Secret updated successfully!"
+          restartPolicy: OnFailure
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cookie-updater-sa
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cookie-updater-role
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cookie-updater-binding
+subjects:
+- kind: ServiceAccount
+  name: cookie-updater-sa
+roleRef:
+  kind: Role
+  name: cookie-updater-role
+  apiGroup: rbac.authorization.k8s.io

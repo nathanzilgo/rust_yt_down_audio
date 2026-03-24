@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yt-down
+  labels:
+    app: yt-down
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: yt-down
+  template:
+    metadata:
+      labels:
+        app: yt-down
+    spec:
+      containers:
+      - name: yt-down
+        image: your-docker-registry/yt-down:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+        env:
+        - name: PORT
+          value: "8080"
+        - name: COOKIES_PATH
+          value: "/secrets/cookies.txt"
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "2000m"
+            memory: "1Gi"
+        volumeMounts:
+        - name: cookie-volume
+          mountPath: /secrets
+          readOnly: true
+        - name: tmp-volume
+          mountPath: /tmp
+      volumes:
+      - name: cookie-volume
+        secret:
+          secretName: yt-cookies
+          optional: true
+      - name: tmp-volume
+        emptyDir: {}

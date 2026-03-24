@@ -459,6 +459,60 @@
             color: var(--accent);
         }
 
+        /* Progress Bar */
+        .progress-container {
+            margin-top: 16px;
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            animation: slide-in 0.3s ease;
+        }
+
+        .progress-container.visible {
+            display: flex;
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .progress-bar-bg {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--gradient-1);
+            width: 0%;
+            border-radius: 3px;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        .progress-bar-fill.indeterminate {
+            width: 30% !important;
+            animation: progress-indeterminate 1.5s infinite ease-in-out;
+        }
+
+        @keyframes progress-indeterminate {
+            0% {
+                transform: translateX(-100%);
+            }
+            100% {
+                transform: translateX(330%);
+            }
+        }
+
         /* Responsive */
         @media (max-width: 480px) {
             .container {
@@ -507,6 +561,16 @@
                 <div class="spinner"></div>
             </button>
 
+            <div class="progress-container" id="progress-container">
+                <div class="progress-label">
+                    <span id="progress-status">Downloading...</span>
+                    <span id="progress-percent">0%</span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="progress-bar"></div>
+                </div>
+            </div>
+
             <div class="status" id="status">
                 <div class="status-header">
                     <span class="status-icon" id="status-icon"></span>
@@ -529,6 +593,10 @@
         const status = document.getElementById('status');
         const statusIcon = document.getElementById('status-icon');
         const statusText = document.getElementById('status-text');
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+        const progressPercent = document.getElementById('progress-percent');
+        const progressStatus = document.getElementById('progress-status');
 
         // Allow pressing Enter to submit
         urlInput.addEventListener('keydown', (e) => {
@@ -565,6 +633,34 @@
             }
         }
 
+        function showProgress() {
+            progressContainer.classList.add('visible');
+            progressBar.classList.add('indeterminate');
+            progressBar.style.width = '0%';
+            progressPercent.textContent = '0%';
+            progressStatus.textContent = 'Starting download...';
+        }
+
+        function hideProgress() {
+            progressContainer.classList.remove('visible');
+            progressBar.classList.remove('indeterminate');
+        }
+
+        function updateProgress(loaded, total) {
+            progressBar.classList.remove('indeterminate');
+            const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
+            progressBar.style.width = percent + '%';
+            progressPercent.textContent = percent + '%';
+            
+            const loadedMB = (loaded / 1024 / 1024).toFixed(1);
+            if (total > 0) {
+                const totalMB = (total / 1024 / 1024).toFixed(1);
+                progressStatus.textContent = `Downloading... ${loadedMB} MB / ${totalMB} MB`;
+            } else {
+                progressStatus.textContent = `Downloading... ${loadedMB} MB`;
+            }
+        }
+
         async function handleDownload() {
             const url = urlInput.value.trim();
 
@@ -581,8 +677,8 @@
             }
 
             hideStatus();
+            hideProgress();
             setLoading(true);
-            showStatus('info', '⏳', 'Downloading and converting... This may take a minute.');
 
             try {
                 const response = await fetch('/download', {
@@ -596,6 +692,9 @@
                     throw { raw: errorText, friendly: parseYtdlpError(errorText) };
                 }
 
+                // Show progress bar only after download starts
+                showProgress();
+
                 // Get filename from Content-Disposition header
                 const disposition = response.headers.get('Content-Disposition');
                 let filename = 'download.mp3';
@@ -604,8 +703,25 @@
                     if (match) filename = match[1];
                 }
 
-                // Create download
-                const blob = await response.blob();
+                // Get total size if available
+                const contentLength = response.headers.get('Content-Length');
+                const total = contentLength ? parseInt(contentLength, 10) : 0;
+
+                // Read response body with progress tracking
+                const reader = response.body.getReader();
+                const chunks = [];
+                let loaded = 0;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    chunks.push(value);
+                    loaded += value.length;
+                    updateProgress(loaded, total);
+                }
+
+                // Combine chunks into blob
+                const blob = new Blob(chunks);
                 const blobUrl = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = blobUrl;
@@ -615,8 +731,10 @@
                 document.body.removeChild(a);
                 URL.revokeObjectURL(blobUrl);
 
+                hideProgress();
                 showStatus('success', '✅', `Downloaded: ${filename}`);
             } catch (err) {
+                hideProgress();
                 if (err.friendly) {
                     showStatus('error', '❌', err.friendly, err.raw);
                 } else {
