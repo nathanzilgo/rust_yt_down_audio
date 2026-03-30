@@ -7,8 +7,7 @@ pub fn build_ytdlp_args(url: &str, output_template: &str) -> Vec<String> {
     let mut args = vec![
         "-x".to_string(),
         "--audio-format".to_string(), "mp3".to_string(),
-        "--extractor-args".to_string(), "youtube:player_client=web".to_string(),
-        "--remote-components".to_string(), "ejs:github".to_string(),
+        "--extractor-args".to_string(), "youtube:player_client=default".to_string(),
         "-o".to_string(), output_template.to_string(),
     ];
 
