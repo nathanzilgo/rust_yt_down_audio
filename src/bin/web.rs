@@ -5,7 +5,6 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use local_ip_address::local_ip;
 use serde::Deserialize;
 use tower_http::cors::CorsLayer;
 use uuid::Uuid;
