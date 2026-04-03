@@ -1,4 +1,4 @@
-default: build run
+default: install build run
 
 install:
 	@echo "Checking dependencies..."

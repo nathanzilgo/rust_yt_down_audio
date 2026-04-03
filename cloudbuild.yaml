@@ -25,10 +25,10 @@ steps:
       - '--port=8080'
       - '--memory=512Mi'
       - '--cpu=1'
-      - '--timeout=300'
+      - '--timeout=600'
       - '--concurrency=10'
       - '--min-instances=0'
-      - '--max-instances=2'
+      - '--max-instances=5'
       - '--update-secrets=/secrets/cookies.txt=youtube-cookies:latest'
 
 substitutions:

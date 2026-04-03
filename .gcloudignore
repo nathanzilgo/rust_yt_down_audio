@@ -1,3 +1,5 @@
 /target
 *.mp3
 README.local.md
+*.lock
+Cargo.lock

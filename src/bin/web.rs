@@ -119,7 +119,7 @@ async fn download(Json(payload): Json<DownloadRequest>) -> impl IntoResponse {
 
 #[tokio::main]
 async fn main() {
-    let my_local_ip: &str = "127.0.0.1";
+    let my_local_ip: &str = "0.0.0.0";
     let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
     let addr = format!("{}:{}", my_local_ip, port);
 

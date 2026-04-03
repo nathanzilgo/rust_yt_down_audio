@@ -1,9 +1,5 @@
 import sys
 
-# ALWAYS USE CONDA ENVIRONMENTS FOR PYTHON RUNTIMES LOCALLY!
-# e.g., conda create -n yt-cookies python=3.12
-# conda activate yt-cookies
-
 def generate_cookies():
     '''
     There are several ways to automate cookie renewal:

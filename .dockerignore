@@ -5,3 +5,4 @@ target/
 *.md
 *.mp3
 *.mp4
+*.lock
