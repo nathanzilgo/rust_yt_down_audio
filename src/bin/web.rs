@@ -1,11 +1,13 @@
 use axum::{
+    body::Body,
     extract::Json,
     http::{header, HeaderMap, HeaderValue, StatusCode},
-    response::{Html, IntoResponse},
+    response::{Html, IntoResponse, Response},
     routing::{get, post},
     Router,
 };
 use serde::Deserialize;
+use tokio_util::io::ReaderStream;
 use tower_http::cors::CorsLayer;
 use uuid::Uuid;
 
@@ -24,27 +26,17 @@ async fn health() -> &'static str {
     "ok"
 }
 
-async fn download(Json(payload): Json<DownloadRequest>) -> impl IntoResponse {
+async fn download(Json(payload): Json<DownloadRequest>) -> Response {
     let url = payload.url.trim().to_string();
 
-    // Basic validation
     if url.is_empty() {
-        return (
-            StatusCode::BAD_REQUEST,
-            HeaderMap::new(),
-            b"Missing URL".to_vec(),
-        );
+        return (StatusCode::BAD_REQUEST, "Missing URL").into_response();
     }
 
     if !url.contains("youtube.com") && !url.contains("youtu.be") {
-        return (
-            StatusCode::BAD_REQUEST,
-            HeaderMap::new(),
-            b"Invalid YouTube URL".to_vec(),
-        );
+        return (StatusCode::BAD_REQUEST, "Invalid YouTube URL").into_response();
     }
 
-    // Create a unique temp directory for this download
     let download_id = Uuid::new_v4().to_string();
     let download_dir = format!("/tmp/yt_down_{}", download_id);
     std::fs::create_dir_all(&download_dir).unwrap_or_default();
@@ -59,7 +51,6 @@ async fn download(Json(payload): Json<DownloadRequest>) -> impl IntoResponse {
         match output {
             Ok(output) => {
                 if output.status.success() {
-                    // Find the downloaded MP3 file
                     if let Ok(entries) = std::fs::read_dir(&download_dir) {
                         for entry in entries.flatten() {
                             let path = entry.path();
@@ -69,9 +60,11 @@ async fn download(Json(payload): Json<DownloadRequest>) -> impl IntoResponse {
                                     .unwrap_or_default()
                                     .to_string_lossy()
                                     .to_string();
-                                let data = std::fs::read(&path).unwrap_or_default();
-                                let _ = std::fs::remove_dir_all(&download_dir);
-                                return Ok((filename, data));
+                                let file_size = std::fs::metadata(&path)
+                                    .map(|m| m.len())
+                                    .unwrap_or(0);
+                                let file_path = path.to_string_lossy().into_owned();
+                                return Ok((filename, file_path, file_size, download_dir));
                             }
                         }
                     }
@@ -92,36 +85,52 @@ async fn download(Json(payload): Json<DownloadRequest>) -> impl IntoResponse {
     .await;
 
     match result {
-        Ok(Ok((filename, data))) => {
-            let mut headers = HeaderMap::new();
-            headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("audio/mpeg"));
-            let disposition = format!("attachment; filename=\"{}\"", filename);
-            headers.insert(
-                header::CONTENT_DISPOSITION,
-                HeaderValue::from_str(&disposition).unwrap_or(HeaderValue::from_static(
-                    "attachment; filename=\"download.mp3\"",
-                )),
-            );
-            (StatusCode::OK, headers, data)
+        Ok(Ok((filename, file_path, file_size, download_dir))) => {
+            match tokio::fs::File::open(&file_path).await {
+                Ok(file) => {
+                    // On Linux, unlinking after open keeps the data readable until the fd closes
+                    let _ = tokio::fs::remove_dir_all(&download_dir).await;
+
+                    let mut headers = HeaderMap::new();
+                    headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("audio/mpeg"));
+                    let disposition = format!("attachment; filename=\"{}\"", filename);
+                    headers.insert(
+                        header::CONTENT_DISPOSITION,
+                        HeaderValue::from_str(&disposition).unwrap_or(
+                            HeaderValue::from_static("attachment; filename=\"download.mp3\""),
+                        ),
+                    );
+                    if file_size > 0 {
+                        headers.insert(
+                            header::CONTENT_LENGTH,
+                            HeaderValue::from_str(&file_size.to_string())
+                                .unwrap_or(HeaderValue::from_static("0")),
+                        );
+                    }
+
+                    let body = Body::from_stream(ReaderStream::new(file));
+                    (StatusCode::OK, headers, body).into_response()
+                }
+                Err(e) => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed to open file: {}", e),
+                )
+                    .into_response(),
+            }
         }
-        Ok(Err(e)) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            HeaderMap::new(),
-            e.into_bytes(),
-        ),
+        Ok(Err(e)) => (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            HeaderMap::new(),
-            format!("Task error: {}", e).into_bytes(),
-        ),
+            format!("Task error: {}", e),
+        )
+            .into_response(),
     }
 }
 
 #[tokio::main]
 async fn main() {
-    let my_local_ip: &str = "0.0.0.0";
     let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
-    let addr = format!("{}:{}", my_local_ip, port);
+    let addr = format!("0.0.0.0:{}", port);
 
     println!("🎵 yt_down web server starting on http://{}", addr);
 
