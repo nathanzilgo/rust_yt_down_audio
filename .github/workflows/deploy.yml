@@ -1,0 +1,116 @@
+name: Build & Deploy to Cloud Run
+
+on:
+  push:
+    branches: ["master"]
+    tags: ["v*.*.*"]
+  pull_request:
+    branches: ["master"]
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: us-central1
+  SERVICE_NAME: yt-down
+  # Artifact Registry (preferred over GCR)
+  # Format: REGION-docker.pkg.dev/PROJECT_ID/REPO_NAME/IMAGE_NAME
+  AR_REPO: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/yt-down/yt-down
+
+jobs:
+  # ──────────────────────────────────────────────
+  # Job 1: Build & push the Docker image
+  # ──────────────────────────────────────────────
+  build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write  # Required for Workload Identity Federation
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Authenticate to Google Cloud using Workload Identity Federation
+      # This is the recommended approach for public repos — no long-lived
+      # service account keys are stored as GitHub secrets.
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Authorize Docker push to Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      # Determine the image tag
+      - name: Set image tag
+        id: meta
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="sha-$(echo ${{ github.sha }} | cut -c1-7)"
+          fi
+          echo "image_tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "📦 Image tag: ${TAG}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ env.AR_REPO }}:${{ steps.meta.outputs.image_tag }}
+            ${{ env.AR_REPO }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ──────────────────────────────────────────────
+  # Job 2: Deploy to Cloud Run (only on push, not PRs)
+  # ──────────────────────────────────────────────
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          region: ${{ env.REGION }}
+          image: ${{ env.AR_REPO }}:${{ needs.build.outputs.image_tag }}
+          flags: |
+            --port=8080
+            --memory=512Mi
+            --cpu=1
+            --timeout=600
+            --concurrency=10
+            --min-instances=0
+            --max-instances=5
+            --allow-unauthenticated
+            --update-secrets=/secrets/cookies.txt=youtube-cookies:latest
+
+      - name: Show deployment URL
+        run: |
+          echo "✅ Deployed to: https://${{ env.SERVICE_NAME }}-$(echo ${{ env.PROJECT_ID }} | tr ':' '-').${{ env.REGION }}.run.app"

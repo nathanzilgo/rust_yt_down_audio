@@ -20,11 +20,23 @@ pub fn build_ytdlp_args(url: &str, output_template: &str) -> Vec<String> {
         args.push(temp_cookies_path.to_string());
     } 
     // 1.5 Check for COOKIES_PATH env var (very useful for Kubernetes mounted secrets)
+    // Copy to /tmp because yt-dlp tries to write back to the cookies file on exit,
+    // and secret mounts (Cloud Run, K8s) are read-only, causing OSError [Errno 22].
     else if let Ok(cookies_path) = std::env::var("COOKIES_PATH") {
         if Path::new(&cookies_path).exists() {
-            println!("Using cookies file from path: {}", cookies_path);
-            args.push("--cookies".to_string());
-            args.push(cookies_path);
+            let writable_path = "/tmp/cookies_rw.txt";
+            match std::fs::copy(&cookies_path, writable_path) {
+                Ok(_) => {
+                    println!("Copied cookies from {} to {} (writable)", cookies_path, writable_path);
+                    args.push("--cookies".to_string());
+                    args.push(writable_path.to_string());
+                }
+                Err(e) => {
+                    println!("Failed to copy cookies to writable path: {}, using original", e);
+                    args.push("--cookies".to_string());
+                    args.push(cookies_path);
+                }
+            }
         }
     }
     // 2. Check for cookie files in common locations (e.g. baked into Docker image)

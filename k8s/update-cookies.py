@@ -7,7 +7,7 @@ def generate_cookies():
     2. Using a Selenium/Playwright script to silently connect to a profile, bypass consent, and extract standard cookies.
     3. Exporting them from a headless browser instance.
     
-    For now, replace this pseudo-code with your actual extraction script!
+    For now, replace this pseudo-code with your actual extraction script
     '''
     
     # Example pseudo-output:

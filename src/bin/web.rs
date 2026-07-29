@@ -93,7 +93,36 @@ async fn download(Json(payload): Json<DownloadRequest>) -> Response {
 
                     let mut headers = HeaderMap::new();
                     headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("audio/mpeg"));
-                    let disposition = format!("attachment; filename=\"{}\"", filename);
+
+                    // Build an ASCII-safe fallback filename by replacing non-ASCII chars
+                    let ascii_filename: String = filename
+                        .chars()
+                        .map(|c| if c.is_ascii() && c != '"' && c != '\\' { c } else { '_' })
+                        .collect();
+                    let ascii_filename = if ascii_filename.is_empty() || ascii_filename == ".mp3" {
+                        "download.mp3".to_string()
+                    } else {
+                        ascii_filename
+                    };
+
+                    // RFC 5987 percent-encode the original filename for filename*
+                    let encoded_filename: String = filename
+                        .as_bytes()
+                        .iter()
+                        .map(|&b| {
+                            if b.is_ascii_alphanumeric() || b"!#$&+-.^_`|~".contains(&b) {
+                                String::from(b as char)
+                            } else {
+                                format!("%{:02X}", b)
+                            }
+                        })
+                        .collect();
+
+                    // Use both filename (ASCII fallback) and filename* (UTF-8 encoded original)
+                    let disposition = format!(
+                        "attachment; filename=\"{}\"; filename*=UTF-8''{}",
+                        ascii_filename, encoded_filename
+                    );
                     headers.insert(
                         header::CONTENT_DISPOSITION,
                         HeaderValue::from_str(&disposition).unwrap_or(

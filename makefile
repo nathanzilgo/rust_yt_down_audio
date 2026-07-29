@@ -11,6 +11,7 @@ run:
 	cargo run --release --bin yt_down
 
 web:
+	@echo "Starting local web server on http://localhost:8080"
 	cargo run --release --bin yt_down_web
 
 build:
