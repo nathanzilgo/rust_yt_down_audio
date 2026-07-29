@@ -8,7 +8,7 @@
 set -euo pipefail
 
 # ── Configuration ──────────────────────────────────────────────
-GITHUB_REPO="nathanzilgo/yt_down"        # Your GitHub org/repo
+GITHUB_REPO="nathanzilgo/rust_yt_down_audio"  # Your GitHub org/repo
 POOL_NAME="github-pool"
 PROVIDER_NAME="github-provider"
 SA_NAME="github-actions-deployer"
