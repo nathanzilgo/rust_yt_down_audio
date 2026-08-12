@@ -60,9 +60,19 @@ docker build -t yt_down .
 
 ### Docker
 
+The image defaults to the web server. For the CLI, override the entrypoint:
+
 ```bash
-docker run -it -v "$(pwd)/downloads:/downloads" yt_down
+docker run -it --entrypoint yt_down --rm -v "$(pwd)/downloads:/downloads" yt_down
 ```
+
+For the web server:
+
+```bash
+docker run -p 8080:8080 --rm yt_down
+```
+
+Then open http://localhost:8080.
 
 ### With Cookies (for bot detection)
 
@@ -72,8 +82,8 @@ If YouTube blocks downloads, you can provide cookies:
 2. Run with cookies mounted:
 
 ```bash
-docker run -it -v "$(pwd)/downloads:/downloads" -v "$(pwd)/cookies.txt:/cookiesftxt" yt_down
-```.
+docker run -it --entrypoint yt_down --rm -v "$(pwd)/downloads:/downloads" -v "$(pwd)/cookies.txt:/cookies.txt" yt_down
+```
 
 ## Cloud Deployment (CI/CD)
 
